@@ -50,6 +50,18 @@ import configparser
 from sqlalchemy.sql.expression import update
 from sqlalchemy import exc, func
 
+# LOGGING
+import logging
+
+
+logging.basicConfig(
+    filename="data_flevoland_ddapi.log", format="%(asctime)s %(message)s", filemode="w"
+)
+
+logger = logging.getLogger()
+
+logger.setLevel(logging.INFO)
+
 # local procedures
 from orm_timeseries import (
     Base,
@@ -96,7 +108,7 @@ def setparameter(fc, obstype, wns):
 # 1. Get connection details to the database
 local = True
 if local:
-    fc = r"C:\projecten\kinm\kinm-data-retrieve-scripts"
+    fc = r"D:\documents\kinm-deltares-repo\connection_kinm.txt"
 else:
     dirname = os.path.dirname(__file__)
     fc = os.path.join(dirname, "connection_kinm.txt")
@@ -166,7 +178,7 @@ for loc in locations:
             + "&endTime="
             + str(end_date)
         ).json()["events"]
-        print(
+        logging.info(
             f""" 
                 ------------
                 location code: {location_code}
@@ -177,8 +189,8 @@ for loc in locations:
         )
         if events:
             df = pd.DataFrame(events)
-            print("-----")
-            print(f"events in dataframe form: {df}")
+            logging.info("-----")
+            logging.info(f"events in dataframe form: {df}")
             data_timestamp = datetime.strptime(
                 df["timeStamp"].iloc[0], "%Y-%m-%dT%H:%M:%SZ"
             )
@@ -189,7 +201,7 @@ for loc in locations:
             dfsql.rename(
                 columns={"value": "scalarvalue", "timeStamp": "datetime"}, inplace=True
             )
-            print(f"dataframe to sql is: {dfsql}")
+            logging.info(f"dataframe to sql is: {dfsql}")
             # NOTE to improve speed if last_transaction_id is None which means that
             # it is the first time that we run the script then put the
             if last_transaction_id is None:
@@ -202,7 +214,7 @@ for loc in locations:
                         schema="timeseries",
                     )
                 except exc.IntegrityError as e:
-                    print(f"Exception: {e}")
+                    logging.info(f"Exception: {e}")
             else:
                 for i in range(len(dfsql)):
                     try:
@@ -214,18 +226,19 @@ for loc in locations:
                             schema="timeseries",
                         )
                     except exc.IntegrityError as e:
-                        print(f"Exception: {e}")
+                        logging.info(f"Exception: {e}")
 
         else:
-            print(f'No events found for {observation_type["quantity"]}')
-
+            logging.info(f'No events found for {observation_type["quantity"]}')
+logging.info(f"end of script date of run: {end_date}")
 end_date = dateto_integer(end_date, ddapi=True)
 stmt = (
     update(FileSource)
     .where(FileSource.filesourcekey == filesource_key)
     .values(lasttransactionid=int(end_date))
 )
-engine.execute(stmt)
 
+engine.execute(stmt)
+logging.info(f"run was a success with lasttransactionid: {end_date}")
 session.close()
 engine.dispose()

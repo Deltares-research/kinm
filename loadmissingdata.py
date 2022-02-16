@@ -63,7 +63,8 @@ if not local:
     dirname = r"C:\projecten\kinm\kinm_data"
     fc = os.path.join(dirname, "connection_kinm.txt")
 else:
-    dirname = r"D:\documents\kinm-data"
+    #dirname = r"D:\documents\kinm-data"
+    dirname = r"C:\Users\ouwerker\OneDrive - Stichting Deltares\Documents\KINM\kinm_repo\kinm"  # \kinm-data
     fc = os.path.join(dirname, "connection_kinm.txt")
 
 # enable connection:
@@ -71,15 +72,47 @@ session, engine = establishconnection(fc)
 
 
 def checkdate(engine, p, l, date):
-    stmt = """select count(*) from timeseries.timeseriesvaluesandflags tsv
-    join timeseries.timeseries ts on ts.timeserieskey = tsv.timeserieskey
-    join timeseries.parameter p on p.parameterkey = ts.parameterkey
-    join timeseries.location l on l.locationkey = ts.locationkey 
-    where p.id = '{p}' and l.name = '{l}' and datetime::date = '{d}'::date""".format(
-        p=p, l=l, d=date
-    )
+    if p != "pump":
+        stmt = """select count(*) from timeseries.timeseriesvaluesandflags tsv
+        join timeseries.timeseries ts on ts.timeserieskey = tsv.timeserieskey
+        join timeseries.parameter p on p.parameterkey = ts.parameterkey
+        join timeseries.location l on l.locationkey = ts.locationkey 
+        where p.id = '{p}' and l.name = '{l}' and datetime::date = '{d}'::date""".format(
+            p=p, l=l, d=date
+        )
+    else:
+        stmt = """select count(*) from timeseries.timeseriespumphistory tsp
+        join timeseries.timeseries ts on ts.timeserieskey = tsp.timeserieskey
+        join timeseries.parameter p on p.parameterkey = ts.parameterkey
+        join timeseries.location l on l.locationkey = ts.locationkey 
+        where p.id = '{p}' and l.name = '{l}' and datetime::date = '{d}'::date""".format(
+            p=p, l=l, d=date
+        )
     ld = engine.execute(stmt).fetchall()
     return ld
+
+# mltiple date parsers
+def combine_date_parsers(date_parsers):
+    def combined_date_parser(value):
+        for date_parser in date_parsers:
+            try:
+                return date_parser(value)
+            except ValueError:
+                pass
+        else:
+            raise ValueError(value)
+    return combined_date_parser
+
+# date parsers
+mydateaparser1 = lambda x: datetime.strptime(x, "%d-%m-%Y %H:%M:%S")
+mydateaparser2 = lambda x: datetime.strptime(x, "%m/%d/%Y %H:%M:%S")
+mydateaparser3 = lambda x: datetime.strptime(x, "%d-%m-%Y %H:%M")
+
+mydateaparser = combine_date_parsers([
+    mydateaparser1,
+    mydateaparser2,
+    mydateaparser3,
+])
 
 
 def data2df(datadir, l, location, date, columns, fkey, p):
@@ -94,7 +127,7 @@ def data2df(datadir, l, location, date, columns, fkey, p):
     columnnames.insert(0, "date")
     columnnames.insert(1, "empty")
     if os.path.isfile(adf):
-        mydateaparser = lambda x: datetime.strptime(x, "%d-%m-%Y %H:%M:%S")
+
         df = pd.read_csv(
             adf,
             sep=";",
@@ -104,6 +137,7 @@ def data2df(datadir, l, location, date, columns, fkey, p):
             index_col=False,
             skiprows=3,
             na_values=["1.#R"],
+            encoding='latin_1'
         )
 
         # prepare for ingestion for specific parameter, for specific location and date
@@ -116,6 +150,12 @@ def data2df(datadir, l, location, date, columns, fkey, p):
         dft = df[["date", p]].copy()
         dft["timeserieskey"] = tsk[0].timeserieskey
         dft.dropna(how="any", inplace=True)
+
+        print('dit is de parameter key:', pky)
+        print('dit is de timeseries key:', tsk)
+        print('dit is de dft:', dft)
+        print('dit is de parameter:', p)
+        print('dit is de df head:', df.head())
 
         if p != "pump":
             dft.rename(columns={"date": "datetime", p: "scalarvalue"}, inplace=True)
@@ -140,11 +180,13 @@ def data2df(datadir, l, location, date, columns, fkey, p):
 
 
 # from date, so this date will be included also, at least checked
-fromdate = datetime.strptime("20210218", "%Y%m%d").date()
-todate = datetime.strptime("20210307", "%Y%m%d").date()
+fromdate = datetime.strptime("20210219", "%Y%m%d").date()
+#todate = datetime.strptime("20220101", "%Y%m%d").date()
+now = datetime.now()
+todate = now.date()
 
 datadir = r"N:\Projects\11202000\11202460\B. Measurements and calculations\R\data_downloads_trailers"
-datadir = r"C:\projecten\kinm\kinm_data\temp\meetwagen"
+#datadir = r"C:\projecten\kinm\kinm_data\temp\meetwagen"
 
 dctlocation = {}
 dctlocation["Meettrailer01_RD"] = "trailer1"

@@ -151,12 +151,6 @@ def data2df(datadir, l, location, date, columns, fkey, p):
         dft["timeserieskey"] = tsk[0].timeserieskey
         dft.dropna(how="any", inplace=True)
 
-        print('dit is de parameter key:', pky)
-        print('dit is de timeseries key:', tsk)
-        print('dit is de dft:', dft)
-        print('dit is de parameter:', p)
-        print('dit is de df head:', df.head())
-
         if p != "pump":
             dft.rename(columns={"date": "datetime", p: "scalarvalue"}, inplace=True)
             dft["flags"] = 3
@@ -222,7 +216,7 @@ for l in dctlocation.keys():
                     datadir, l, dctlocation[l], dt, lstparams, fkey.filesourcekey, p
                 )
             else:
-                print("al in de database", dt)
+                print("al in de database", dt, dctlocation[l], p)
 
 session.close()
 engine.dispose()

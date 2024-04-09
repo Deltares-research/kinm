@@ -79,7 +79,7 @@ def establishconnection(fc):
 
     """
     f = open(fc)
-    engine = create_engine(f.read(), echo=False)
+    engine = create_engine(f.readline().rstrip(), echo=False)
     f.close()
 
     Session = sessionmaker(bind=engine)
